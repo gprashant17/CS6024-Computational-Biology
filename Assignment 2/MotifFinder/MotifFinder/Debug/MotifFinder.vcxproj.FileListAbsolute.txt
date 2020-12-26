@@ -1,0 +1,2 @@
+C:\Users\Prashant\Desktop\Sem 7\Algorithmic Approaches to Computational Biology\Assignment 2\MotifFinder\MotifFinder\Debug\MotifFinder.exe
+C:\Users\Prashant\Desktop\Sem 7\Algorithmic Approaches to Computational Biology\Assignment 2\MotifFinder\MotifFinder\Debug\MotifFinder.pdb

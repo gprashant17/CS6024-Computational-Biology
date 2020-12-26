@@ -1,0 +1,163 @@
+from sys import stdin,stdout
+rseed = 0
+RAND_MAX = (1 << 31) - 1
+
+def rand():
+    global rseed 
+    rseed = (rseed * 1103515245 + 12345) & RAND_MAX
+    return rseed
+
+def GibbsSampler(Dna, k, t, N):
+    #Random Initialization
+    Motifs = initializeMotifs(Dna, k, t)
+    #Motifs -> Profile
+    Profile = MotifToProfile(Motifs,Dna,k,t)
+    #Copy BestMotifs and BestProfile
+    BestMotifs = Motifs.copy()
+    BestScore = Score(Profile,k,t)
+    
+    score_dic = {}  #To store Score values of Motifs
+    #Modified rstart for faster runtime
+    for rstart in range(12):    
+        Motifs = initializeMotifs(Dna, k, t)
+        Profile = MotifToProfile(Motifs,Dna,k,t)
+        
+        #Iterate
+        for ite in range(N):
+            #Pick random sequence
+            d = rand()%t
+        
+            #The ProfileDelete Function modifies the original profile to return the updated Profile with Motifs[d] deleted
+            Profile_Del = ProfileDelete(Profile,Dna[d][Motifs[d]:(Motifs[d]+k)],k,t)
+            
+            #Number of kmers in the removed sequence
+            n = len(Dna[d]) - k
+            p = [0]*n
+            #Probilistically choose starting position in the removed sequence
+        
+            for i in range(n):
+                #Calculating Probability using the modified Profile
+                p[i] = calculateProb(Profile_Del,Dna[d][i:i+k],k)
+            #Inverse Sampling 
+            pos = inverseSampling(p,n)
+            
+            #Update Motifs[d] with the new start position
+            Motifs[d] = pos
+            Profile = ProfileAdd(Profile_Del,Dna[d][pos:(pos+k)],k,t)
+            
+            #If the same motif set is encounterd, use the same score, else store it
+            try:
+                score_1 = score_dic[tuple(Motifs)]
+            except:
+                score_1 = score_dic[tuple(Motifs)] = Score(Profile,k,t)
+                
+            #If Score(Profile) is less than Score(BestProfile), then update accordingly
+            if score_1<BestScore:
+                BestMotifs = Motifs.copy()
+                BestScore = score_1
+    return BestMotifs
+    
+def initializeMotifs(Dna, k, t):
+    """
+    Motif initilization
+    """
+    Motifs = []
+    
+    for i in range(t):
+        n = len(Dna[i]) - k 
+        #Random start position
+        Motifs.append(rand()%n)
+    return Motifs
+
+def MotifToProfile(Motifs,Dna,k,t):
+    """
+    Function to builf profile from motifs
+    """
+    #Initialise all value to 1/(t+4), as we are considering pseudocounts
+    Profile  = {"A":[1/(t+4)]*k,"T":[1/(t+4)]*k,"C":[1/(t+4)]*k,"G":[1/(t+4)]*k}
+
+    for i in range(t):
+        for j in range(k):
+            Profile[Dna[i][Motifs[i]:(Motifs[i]+k)][j]][j] += 1/(t+4)
+    return Profile
+
+def calculateProb(Profile,pattern,k):
+    """
+    Function to calculate probability of a pattern given profile
+    """
+    prob = 1
+    
+    for i in range(k):
+        prob *= Profile[pattern[i]][i]
+        
+    return prob
+
+def inverseSampling(p,n):
+    """
+    Function to perform inverse sampling
+    """
+    #Sum of Probs
+    sum_tot = sum(p)
+    
+    distribution = []
+
+    for i in range(n):
+        distribution += [i]*(int(p[i]*100/sum_tot))
+        
+    l = len(distribution)
+    
+    ##Uncomment the below 2 lines if t is large
+    #if l==0:
+     #   return rand()%n
+    
+    #If length<100, then fill the remaining positions by randomly choosing an index
+    for j in range(l,100):
+        distribution.append(distribution[rand()%l])
+        
+    #Return random start position
+    return distribution[rand()%100]
+
+
+def ProfileDelete(Profile,pattern,k,t):
+    """
+    This function updates profile matrix after deletion of a motif
+    """
+    for i in range(k):
+        for base in ["A","T","C","G"]:
+            Profile[base][i] = ((t+4)/(t+3))*(Profile[base][i] - ((base==pattern[i])/(t+4)))
+    return Profile
+
+def ProfileAdd(Profile,pattern,k,t):
+    """
+    This function updates profile matrix after addition of a motif
+    """
+    for i in range(k):
+        for base in ["A","T","C","G"]:
+            Profile[base][i] = ((t+3)/(t+4))*(Profile[base][i] + ((base==pattern[i])/(t+3)))
+    return Profile
+
+def Score(Profile,k,t):
+    """
+    Function to calculate score from profile
+    """
+    score = 0
+    for i in range(k):
+        MAX = 0
+        for base in ["A","T","C","G"]:
+            #Here, p is assigned to the original count
+            p  = Profile[base][i]*(t+4) - 1
+            if MAX<p:
+                MAX=p
+        #Subtracting the total number of sequences with the maximum count in position k
+        score += t-MAX
+    return int(score)
+
+var = stdin.readline()[:-1].split()
+k = int(var[0])
+t = int(var[1])
+N = int(var[2])
+
+Dna = stdin.readlines()
+    
+Motifs = GibbsSampler(Dna, k, t, N)
+stdout.writelines(list(map(lambda pos,index: Dna[index][pos:pos+k]+"\n",Motifs,range(t))))
